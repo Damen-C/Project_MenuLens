@@ -8,7 +8,7 @@ on:
   pull_request:
 
 jobs:
-  lint-and-unit-test:
+  android-ci:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,3 +32,6 @@ jobs:
 
       - name: Run debug unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Assemble debug APK
+        run: ./gradlew assembleDebug --stacktrace
