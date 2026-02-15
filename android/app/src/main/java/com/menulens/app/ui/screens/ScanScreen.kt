@@ -1,6 +1,7 @@
 ﻿package com.menulens.app.ui.screens
 
 import android.Manifest
+import android.graphics.Bitmap
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -9,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -28,9 +30,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import java.io.ByteArrayOutputStream
 
 @Composable
-fun ScanScreen(onMenuImageReady: () -> Unit) {
+fun ScanScreen(onMenuImageReady: (ByteArray) -> Unit) {
     val context = LocalContext.current
     var permissionMessage by remember { mutableStateOf<String?>(null) }
     var capturedPreview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -40,7 +43,7 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
     ) { bitmap ->
         if (bitmap != null) {
             capturedPreview = bitmap
-            onMenuImageReady()
+            onMenuImageReady(bitmap.toJpegByteArray())
         }
     }
 
@@ -49,7 +52,12 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
     ) { uri ->
         if (uri != null) {
             permissionMessage = null
-            onMenuImageReady()
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            if (bytes != null && bytes.isNotEmpty()) {
+                onMenuImageReady(bytes)
+            } else {
+                permissionMessage = "Could not read selected image. Please try another photo."
+            }
         }
     }
 
@@ -65,31 +73,35 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
     }
 
     AppScreen(
-        title = "Understand Japanese menus in Japan",
-        subtitle = "Take a photo or upload a menu image to get English dish explanations."
+        title = "Understand Japanese menus",
+        subtitle = "Take a photo or upload a menu image to get English dish explanations.",
+        centerContent = true,
+        showBrandAsBlock = true
     ) {
         Card(
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            modifier = Modifier.border(
-                width = 2.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(28.dp)
-            )
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 2.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(28.dp)
+                )
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
                     text = "Ready to scan a Japanese menu",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
                     text = "Keep the whole menu in frame. Results list is free, and details can be revealed.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                 )
                 capturedPreview?.let { bitmap ->
@@ -124,7 +136,9 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
                             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -136,7 +150,9 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
                 }
                 Button(
                     onClick = { galleryLauncher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                 ) {
@@ -149,5 +165,11 @@ fun ScanScreen(onMenuImageReady: () -> Unit) {
             }
         }
     }
+}
+
+private fun Bitmap.toJpegByteArray(quality: Int = 90): ByteArray {
+    val stream = ByteArrayOutputStream()
+    compress(Bitmap.CompressFormat.JPEG, quality, stream)
+    return stream.toByteArray()
 }
 

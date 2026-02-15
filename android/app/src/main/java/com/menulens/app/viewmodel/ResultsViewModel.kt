@@ -1,12 +1,12 @@
-﻿package com.menulens.app.viewmodel
+package com.menulens.app.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.menulens.app.data.EntitlementState
 import com.menulens.app.data.EntitlementStore
+import com.menulens.app.data.ScanRepository
 import com.menulens.app.model.MenuItem
-import com.menulens.app.model.MenuPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,11 +17,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class ScanPhase {
+    IDLE,
+    LOADING,
+    SUCCESS,
+    ERROR
+}
+
 data class ResultsUiState(
     val items: List<MenuItem> = emptyList(),
     val creditsRemainingToday: Int = EntitlementStore.DEFAULT_DAILY_CREDITS,
     val isPro: Boolean = false,
-    val unlockedItemIds: Set<String> = emptySet()
+    val unlockedItemIds: Set<String> = emptySet(),
+    val scanPhase: ScanPhase = ScanPhase.IDLE,
+    val scanErrorMessage: String? = null
 ) {
     fun itemById(itemId: String): MenuItem? = items.firstOrNull { it.itemId == itemId }
     fun isUnlocked(itemId: String): Boolean = isPro || unlockedItemIds.contains(itemId)
@@ -34,28 +43,42 @@ sealed interface ResultsNavEvent {
 }
 
 class ResultsViewModel(application: Application) : AndroidViewModel(application) {
+    // Development-only switch: disable paywall/credit limits.
+    private val unlimitedDevMode = true
+
     private val entitlementStore = EntitlementStore(application.applicationContext)
+    private val scanRepository = ScanRepository(application.applicationContext)
 
     private val unlockedItemIds = MutableStateFlow<Set<String>>(emptySet())
-    private val staticItems = sampleMenuItems()
+    private val scannedItems = MutableStateFlow<List<MenuItem>>(emptyList())
+    private val scanPhase = MutableStateFlow(ScanPhase.IDLE)
+    private val scanErrorMessage = MutableStateFlow<String?>(null)
+    private var pendingImageBytes: ByteArray? = null
 
     private val entitlementState = entitlementStore.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EntitlementState(3, false))
 
     val uiState: StateFlow<ResultsUiState> = combine(
         entitlementState,
-        unlockedItemIds
-    ) { entitlement, unlocked ->
+        unlockedItemIds,
+        scannedItems,
+        scanPhase,
+        scanErrorMessage
+    ) { entitlement, unlocked, items, phase, error ->
+        val effectiveIsPro = if (unlimitedDevMode) true else entitlement.isPro
+        val effectiveCredits = if (unlimitedDevMode) Int.MAX_VALUE else entitlement.creditsRemainingToday
         ResultsUiState(
-            items = staticItems,
-            creditsRemainingToday = entitlement.creditsRemainingToday,
-            isPro = entitlement.isPro,
-            unlockedItemIds = unlocked
+            items = items,
+            creditsRemainingToday = effectiveCredits,
+            isPro = effectiveIsPro,
+            unlockedItemIds = unlocked,
+            scanPhase = phase,
+            scanErrorMessage = error
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        ResultsUiState(items = staticItems)
+        ResultsUiState()
     )
 
     private val _navEvents = MutableSharedFlow<ResultsNavEvent>(extraBufferCapacity = 8)
@@ -71,6 +94,41 @@ class ResultsViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             entitlementStore.refreshCreditsIfNeeded()
             unlockedItemIds.value = emptySet()
+            scannedItems.value = emptyList()
+            scanPhase.value = ScanPhase.IDLE
+            scanErrorMessage.value = null
+        }
+    }
+
+    fun queueScanImage(imageBytes: ByteArray) {
+        pendingImageBytes = imageBytes
+        scanPhase.value = ScanPhase.IDLE
+        scanErrorMessage.value = null
+        scannedItems.value = emptyList()
+        unlockedItemIds.value = emptySet()
+    }
+
+    fun processPendingScan() {
+        if (scanPhase.value == ScanPhase.LOADING) return
+        val imageBytes = pendingImageBytes
+        if (imageBytes == null) {
+            scanPhase.value = ScanPhase.ERROR
+            scanErrorMessage.value = "No image selected. Please scan or upload a menu photo."
+            return
+        }
+
+        viewModelScope.launch {
+            scanPhase.value = ScanPhase.LOADING
+            scanErrorMessage.value = null
+            try {
+                val items = scanRepository.scanMenu(imageBytes)
+                scannedItems.value = items
+                scanPhase.value = ScanPhase.SUCCESS
+                pendingImageBytes = null
+            } catch (exc: Exception) {
+                scanPhase.value = ScanPhase.ERROR
+                scanErrorMessage.value = "Scan failed: ${exc.message ?: "Unknown error"}"
+            }
         }
     }
 
@@ -103,6 +161,12 @@ class ResultsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun handleRevealOrNavigate(itemId: String) {
+        if (unlimitedDevMode) {
+            unlockedItemIds.update { it + itemId }
+            _navEvents.emit(ResultsNavEvent.OpenDetail(itemId))
+            return
+        }
+
         val current = uiState.value
         when (
             RevealPolicy.decide(
@@ -114,10 +178,12 @@ class ResultsViewModel(application: Application) : AndroidViewModel(application)
             RevealDecision.OPEN_ALREADY_UNLOCKED -> {
                 _navEvents.emit(ResultsNavEvent.OpenDetail(itemId))
             }
+
             RevealDecision.OPEN_WITH_PRO -> {
                 unlockedItemIds.update { it + itemId }
                 _navEvents.emit(ResultsNavEvent.OpenDetail(itemId))
             }
+
             RevealDecision.CONSUME_CREDIT_AND_OPEN -> {
                 val consumed = entitlementStore.tryConsumeCredit()
                 if (consumed) {
@@ -127,48 +193,10 @@ class ResultsViewModel(application: Application) : AndroidViewModel(application)
                     _navEvents.emit(ResultsNavEvent.OpenPaywall)
                 }
             }
+
             RevealDecision.OPEN_PAYWALL -> {
                 _navEvents.emit(ResultsNavEvent.OpenPaywall)
             }
         }
     }
-
-    private fun sampleMenuItems(): List<MenuItem> {
-        return listOf(
-            MenuItem(
-                itemId = "item-1",
-                jpText = "醤油ラーメン",
-                priceText = "900円",
-                preview = MenuPreview(
-                    enTitle = "Shoyu Ramen",
-                    enDescription = "Typically soy sauce-based ramen with sliced pork and green onion.",
-                    tags = listOf("pork_possible"),
-                    images = listOf("https://example.com/ramen.jpg")
-                )
-            ),
-            MenuItem(
-                itemId = "item-2",
-                jpText = "親子丼",
-                priceText = "850円",
-                preview = MenuPreview(
-                    enTitle = "Oyako-don",
-                    enDescription = "Usually a rice bowl topped with chicken and egg simmered in sweet-savory broth.",
-                    tags = listOf("egg", "chicken"),
-                    images = listOf("https://example.com/oyakodon.jpg")
-                )
-            ),
-            MenuItem(
-                itemId = "item-3",
-                jpText = "焼き魚定食",
-                priceText = "1100円",
-                preview = MenuPreview(
-                    enTitle = "Grilled Fish Set",
-                    enDescription = "Often includes grilled fish, rice, miso soup, and small side dishes.",
-                    tags = listOf("fish_possible"),
-                    images = listOf("https://example.com/fish-set.jpg")
-                )
-            )
-        )
-    }
 }
-
