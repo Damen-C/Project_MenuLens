@@ -7,8 +7,18 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+copy .env.example .env
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Set these values in `.env` before running:
+- `GOOGLE_CLOUD_VISION_API_KEY`
+- `GEMINI_API_KEY`
+- `GOOGLE_CSE_API_KEY`
+- `GOOGLE_CSE_CX`
+
+Optional:
+- `GEMINI_MODEL` (default: `gemini-1.5-flash`)
 
 ## Test endpoint
 

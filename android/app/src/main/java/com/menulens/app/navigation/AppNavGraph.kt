@@ -41,14 +41,21 @@ fun AppNavGraph() {
     ) {
         composable(Route.Scan.value) {
             ScanScreen(
-                onMenuImageReady = {
+                onMenuImageReady = { imageBytes ->
                     resultsViewModel.startNewScanSession()
+                    resultsViewModel.queueScanImage(imageBytes)
                     navController.navigate(Route.Processing.value)
                 }
             )
         }
         composable(Route.Processing.value) {
             ProcessingScreen(
+                state = uiState.value,
+                onStartProcessing = resultsViewModel::processPendingScan,
+                onRetry = resultsViewModel::processPendingScan,
+                onBackToScan = {
+                    navController.popBackStack(Route.Scan.value, false)
+                },
                 onProcessingComplete = {
                     navController.navigateSingleTop(Route.Results.value)
                 }
@@ -57,8 +64,7 @@ fun AppNavGraph() {
         composable(Route.Results.value) {
             ResultsScreen(
                 state = uiState.value,
-                onItemTap = resultsViewModel::onResultItemSelected,
-                onShowToStaff = resultsViewModel::onShowToStaff
+                onItemTap = resultsViewModel::onResultItemSelected
             )
         }
         composable(

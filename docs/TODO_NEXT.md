@@ -1,76 +1,60 @@
 # TODO - Next Iteration
 
-## Goal A: UI polish (keep PRD behavior unchanged)
-1. Build a reusable design system layer
-- Create common components: `PrimaryCtaButton`, `SecondaryCtaButton`, `StatusChip`, `LockedCard`.
-- Centralize spacing/shape constants to avoid per-screen drift.
+## Goal A: Unblock image retrieval in production path
+1. Resolve Google Custom Search 403
+- Verify billing + API enablement + key restriction propagation for `Custom Search API`.
+- Validate `GOOGLE_CSE_API_KEY` + `GOOGLE_CSE_CX` with direct API test.
+- Remove temporary CSE failure dependency on manual troubleshooting.
 
-2. Improve visual consistency across screens
-- Harmonize card/header/button sizes and shadow depth.
-- Add lightweight motion:
-  - screen enter transitions,
-  - button press feedback,
-  - processing skeleton shimmer.
+2. Keep scans functional while CSE is unstable
+- Keep `ENABLE_IMAGE_SEARCH` flag behavior documented and tested.
+- Add explicit "images unavailable" fallback UI in Detail when image list is empty.
 
-3. Upgrade result/detail clarity
-- Results:
-  - clearer lock icon treatment,
-  - free vs gated section separation.
-- Detail:
-  - stronger locked placeholders,
-  - more obvious reveal CTA states.
+3. Add stronger backend observability
+- Log per-stage timing and status (Vision, Gemini, CSE) without logging raw images.
+- Add structured error codes in API response for easier mobile debugging.
 
-4. Add iconography and illustration assets
-- Introduce small in-app icon set for scan/result/lock/pro states.
-- Add one mascot/illustration per major screen (optimized PNG/WebP).
+## Goal B: Improve end-to-end reliability on real phones
+1. Networking hardening
+- Replace hardcoded `API_BASE_URL` with build flavor/env-driven config.
+- Add clear "cannot reach backend" diagnosis text for LAN/firewall mismatch cases.
+- Add retry/backoff for transient upstream failures.
 
-## Goal B: Real English translation + backend integration
-1. Wire Android to real backend scan endpoint
-- Implement Retrofit call for `POST /v1/scan_menu` multipart.
-- Send required fields:
-  - `image`,
-  - `target_lang="en"`,
-  - `device_id`,
-  - `app_version`,
-  - `timezone="Asia/Tokyo"`.
+2. Image upload performance
+- Resize/compress captured images before upload to reduce timeout risk.
+- Add max upload size guard and user-facing error when image is too large.
 
-2. Replace hardcoded items with API response mapping
-- Create DTOs matching frozen contract exactly.
-- Map DTO -> domain model used by `ResultsViewModel`.
-- Handle loading/error/empty states on `Processing` and `Results`.
+3. Processing UX
+- Show phase hints: "Reading text", "Translating", "Finding images".
+- Add cancel action during long scans.
 
-3. Implement backend translation/explanation pipeline
-- Keep endpoint: `POST /v1/scan_menu`.
-- Add/complete modules:
-  - OCR stub/parser,
-  - title translation,
-  - Gemini dish explanation (`google-genai`),
-  - restaurant type detection,
-  - image retrieval stub.
-- Enforce `en_description` constraints:
-  - 1-2 sentences,
-  - cautious language,
-  - tourist-friendly,
-  - fallback text on failure.
+## Goal C: Feature completion for current product intent
+1. Render real images in detail screen
+- Replace placeholders with Coil image cards from backend URLs.
+- Add tap-to-expand and graceful fallback when URL fails.
 
-4. Security/config correctness
-- Read `GEMINI_API_KEY` and optional `GEMINI_MODEL` via env vars.
-- Ensure image is processed-and-discarded (no storage/logging raw image).
-- Add `MAX_ITEMS` support.
+2. Data/contract tightening
+- Add response model tests for malformed Gemini output.
+- Add input/output validation for minimum required fields per item.
 
-## Goal C: Tests to add immediately
-1. Unit tests
-- Reveal decrement when not Pro.
-- No decrement when already unlocked.
-- Paywall when 0 credits and not Pro.
-- Tokyo-day reset behavior.
+3. Localization and copy pass
+- Keep English-first experience.
+- Ensure Japanese fallback text renders correctly (UTF-8 sanity checks).
 
-2. Integration/UI tests
-- Scan flow: camera/gallery path -> processing -> results.
-- Locked item shows no English text before reveal.
-- Show-to-staff screen never exposes gated English content.
+## Goal D: Test and release hygiene
+1. Automated tests
+- Add backend unit tests for parsing/fallback behavior.
+- Add Android integration tests for:
+  - scan success flow,
+  - timeout/retry flow,
+  - empty-image fallback rendering.
+
+2. CI updates
+- Add backend lint/test job to GitHub Actions.
+- Add API smoke test step (mocked external services).
 
 ## Definition of Done for next cycle
-- Real backend scan call returns and renders live data.
-- PRD gating remains intact with passing tests.
-- UI polish applied consistently without regressions.
+- Phone scan returns stable English text results without timeout regressions.
+- Image section either renders real photos or a clean fallback state.
+- CSE failure no longer blocks user flow and is diagnosable from logs.
+- Backend + Android test coverage added for critical scan paths.

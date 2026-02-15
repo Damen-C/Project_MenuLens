@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -17,13 +19,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import com.menulens.app.viewmodel.ResultsUiState
+import com.menulens.app.viewmodel.ScanPhase
 
 @Composable
-fun ProcessingScreen(onProcessingComplete: () -> Unit) {
+fun ProcessingScreen(
+    state: ResultsUiState,
+    onStartProcessing: () -> Unit,
+    onRetry: () -> Unit,
+    onBackToScan: () -> Unit,
+    onProcessingComplete: () -> Unit
+) {
     LaunchedEffect(Unit) {
-        delay(1200)
-        onProcessingComplete()
+        onStartProcessing()
+    }
+
+    LaunchedEffect(state.scanPhase) {
+        if (state.scanPhase == ScanPhase.SUCCESS) {
+            onProcessingComplete()
+        }
     }
 
     AppScreen(
@@ -47,13 +61,37 @@ fun ProcessingScreen(onProcessingComplete: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondary)
-                Text(
-                    text = "Identifying dishes and generating tourist-friendly descriptions...",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                if (state.scanPhase == ScanPhase.ERROR) {
+                    Text(
+                        text = state.scanErrorMessage ?: "Scan failed. Please try again.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Retry scan")
+                    }
+                    Button(
+                        onClick = onBackToScan,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Text("Back to scan")
+                    }
+                } else {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondary)
+                    Text(
+                        text = "Identifying dishes and generating tourist-friendly descriptions...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }

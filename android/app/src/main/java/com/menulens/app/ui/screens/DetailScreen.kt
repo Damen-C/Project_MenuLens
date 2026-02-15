@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,7 +33,7 @@ fun DetailScreen(
 
     AppScreen(
         title = "Item Detail",
-        subtitle = "Japanese text is always visible. English details require reveal."
+        subtitle = ""
     ) {
         Card(
             shape = RoundedCornerShape(24.dp),
@@ -48,48 +49,47 @@ fun DetailScreen(
                 modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = item?.jpText ?: "Unknown item",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (!item?.priceText.isNullOrBlank()) {
-                    Text(
-                        text = item?.priceText.orEmpty(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-
-                Button(
-                    onClick = onShowToStaff,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary
-                    )
-                ) {
-                    Text("Show to staff")
-                }
-
                 if (unlocked && item != null) {
                     Text(
                         text = item.preview.enTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = item.preview.enDescription,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Tags: ${item.preview.tags.joinToString()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = item.jpText,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FoodImagePlaceholder(
+                            label = "Dish image 1 (placeholder)",
+                            modifier = Modifier.weight(1f)
+                        )
+                        FoodImagePlaceholder(
+                            label = "Dish image 2 (placeholder)",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Button(
+                        onClick = onShowToStaff,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
+                        )
+                    ) {
+                        Text("Show to staff")
+                    }
                     Text(
-                        text = "Best-effort; confirm with staff for allergies.",
+                        text = "Image search placeholders for matching dish photos.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
@@ -132,4 +132,28 @@ private fun LockedPlaceholder() {
                 shape = RoundedCornerShape(10.dp)
             )
     )
+}
+
+@Composable
+private fun FoodImagePlaceholder(label: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(120.dp)
+            .background(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .padding(10.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
 }

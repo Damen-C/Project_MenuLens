@@ -10,6 +10,8 @@ on:
 jobs:
   android-ci:
     runs-on: ubuntu-latest
+    env:
+      GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=1g -Dorg.gradle.daemon=false
     defaults:
       run:
         working-directory: android
@@ -28,10 +30,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Lint debug
-        run: ./gradlew lintDebug --stacktrace
+        run: ./gradlew lintDebug --stacktrace --no-daemon --max-workers=2
 
       - name: Run debug unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon --max-workers=2
 
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --no-daemon --max-workers=2
