@@ -58,7 +58,7 @@ Set required keys in `backend/.env`:
 
 Optional:
 
-- `GEMINI_MODEL` (default `gemini-1.5-flash`)
+- `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `ENABLE_IMAGE_SEARCH=false` (temporary workaround if CSE is failing)
 
 Run backend:
