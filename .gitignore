@@ -32,3 +32,6 @@ captures/
 
 # Logs
 *.log
+
+# Secrets
+backend/keys/
