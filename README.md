@@ -9,7 +9,8 @@ MenuLens is an Android app for scanning Japanese menus and showing English-frien
 - Live pipeline implemented:
   - OCR: Google Cloud Vision API
   - Dish extraction/translation/description: Gemini
-  - Image retrieval: Google Custom Search API (currently optional/fallback-safe)
+  - Image retrieval: provider-based (`none | cse | vertex`)
+  - Current recommended provider: Vertex AI Search
 - CI: Android lint + unit tests + debug assemble on GitHub Actions
 
 ## Repo Structure
@@ -53,13 +54,25 @@ Set required keys in `backend/.env`:
 
 - `GOOGLE_CLOUD_VISION_API_KEY`
 - `GEMINI_API_KEY`
-- `GOOGLE_CSE_API_KEY`
-- `GOOGLE_CSE_CX`
 
 Optional:
 
-- `GEMINI_MODEL` (default `gemini-2.5-flash`)
-- `ENABLE_IMAGE_SEARCH=false` (temporary workaround if CSE is failing)
+- `GEMINI_MODEL` (default `gemini-1.5-flash`)
+- `ENABLE_IMAGE_SEARCH=true|false` (default `true`)
+- `IMAGE_SEARCH_PROVIDER=none|cse|vertex`
+
+If `IMAGE_SEARCH_PROVIDER=cse`:
+- `GOOGLE_CSE_API_KEY`
+- `GOOGLE_CSE_CX`
+
+If `IMAGE_SEARCH_PROVIDER=vertex`:
+- `GCP_PROJECT_ID`
+- `VERTEX_SEARCH_LOCATION` (usually `global`)
+- `VERTEX_SEARCH_APP_ID`
+
+Vertex auth (required when using `vertex`):
+- Service-account JSON: set `GOOGLE_APPLICATION_CREDENTIALS` to key file path, or
+- Local ADC login: `gcloud auth application-default login`
 
 Run backend:
 
@@ -91,11 +104,13 @@ Use:
 
 ## Known Issue (Current)
 
-- Google Custom Search may return `403` depending on billing/key/project config.
-- Temporary behavior is implemented: scan continues with OCR/English text even if image search fails.
+- Custom Search JSON API has onboarding limitations for new users/projects.
+- Some retrieved image URLs can still be source-dependent and may fail on-device.
+- Fallback behavior is implemented: scan continues with OCR/English text even if image retrieval fails.
 
 ## Docs
 
 - `docs/WORKLOG_2026-02-15.md`
+- `docs/WORKLOG_2026-02-16.md`
 - `docs/TODO_NEXT.md`
 - `docs/QUALITY_CHECKLIST.md`
