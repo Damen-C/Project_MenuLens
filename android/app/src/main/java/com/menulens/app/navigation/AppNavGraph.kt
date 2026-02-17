@@ -87,6 +87,7 @@ fun AppNavGraph() {
             val item = uiState.value.itemById(itemId)
             ShowToStaffScreen(
                 jpText = item?.jpText.orEmpty(),
+                enText = item?.preview?.enTitle,
                 priceText = item?.priceText
             )
         }

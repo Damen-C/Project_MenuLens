@@ -17,15 +17,24 @@ Set these values in `.env` before running:
 
 Optional:
 - `GEMINI_MODEL` (default: `gemini-1.5-flash`)
+- `OCR_PIPELINE_MODE` (`hybrid` or `vision_only`; default: `hybrid`)
+- `MAX_MENU_ITEMS` (default: `10`, valid range: `1..20`)
 - `ENABLE_IMAGE_SEARCH` (default: `true`)
 - `IMAGE_SEARCH_PROVIDER` (`none`, `cse`, or `vertex`; default: `cse`)
 - `GOOGLE_CSE_API_KEY` and `GOOGLE_CSE_CX` (required only when `IMAGE_SEARCH_PROVIDER=cse`)
 - `GCP_PROJECT_ID`, `VERTEX_SEARCH_LOCATION`, `VERTEX_SEARCH_APP_ID` (required only when `IMAGE_SEARCH_PROVIDER=vertex`)
 
 Notes:
+- `OCR_PIPELINE_MODE=hybrid` runs Vision OCR first, then Gemini text normalization before menu parsing.
+- `OCR_PIPELINE_MODE=vision_only` skips normalization and parses directly from raw Vision OCR text.
+- Parser prompt now explicitly discourages style inference (for example adding "nigiri"/"gunkan" when OCR text does not state it).
 - `Custom Search JSON API` may be unavailable for new projects/accounts.
 - `IMAGE_SEARCH_PROVIDER=none` disables image retrieval while keeping OCR/translation flow functional.
 - Vertex provider uses Google ADC credentials (service-account JSON via `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth application-default login`).
+
+Response diagnostics:
+- `items[].ocr_diagnostics` includes per-item calibration signals (`match_score`, `source_quality`, `weak_reasons`).
+- `pipeline_diagnostics` includes coverage signals (`estimated_ocr_candidate_count`, `returned_item_count`, `coverage_ratio`).
 
 ### Recommended vertex config
 

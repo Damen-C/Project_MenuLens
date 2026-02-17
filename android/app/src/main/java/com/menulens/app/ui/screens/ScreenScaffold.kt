@@ -31,6 +31,8 @@ fun AppScreen(
     subtitle: String,
     centerContent: Boolean = false,
     showBrandAsBlock: Boolean = false,
+    showHeaderCard: Boolean = true,
+    topPadding: Dp = 20.dp,
     content: @Composable () -> Unit
 ) {
     val backgroundBrush = Brush.verticalGradient(
@@ -65,7 +67,7 @@ fun AppScreen(
             modifier = Modifier
                 .statusBarsPadding()
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(start = 20.dp, top = topPadding, end = 20.dp, bottom = 20.dp),
             verticalArrangement = if (centerContent) {
                 Arrangement.spacedBy(20.dp, Alignment.CenterVertically)
             } else {
@@ -94,35 +96,37 @@ fun AppScreen(
                 }
             }
 
-            Card(
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(28.dp)
-                    )
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (subtitle.isNotBlank()) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+            if (showHeaderCard) {
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(28.dp)
                         )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (subtitle.isNotBlank()) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+                            )
+                        }
                     }
                 }
             }
