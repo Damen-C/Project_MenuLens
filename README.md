@@ -58,6 +58,8 @@ Set required keys in `backend/.env`:
 Optional:
 
 - `GEMINI_MODEL` (default `gemini-1.5-flash`)
+- `OCR_PIPELINE_MODE=hybrid|vision_only` (default `hybrid`)
+- `MAX_MENU_ITEMS` (default `10`, valid `1..20`)
 - `ENABLE_IMAGE_SEARCH=true|false` (default `true`)
 - `IMAGE_SEARCH_PROVIDER=none|cse|vertex`
 
@@ -112,5 +114,5 @@ Use:
 
 - `docs/WORKLOG_2026-02-15.md`
 - `docs/WORKLOG_2026-02-16.md`
-- `docs/TODO_NEXT.md`
+- `docs/WORKLOG_2026-02-17.md`
 - `docs/QUALITY_CHECKLIST.md`
