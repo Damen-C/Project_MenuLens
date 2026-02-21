@@ -6,14 +6,20 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Button
@@ -27,8 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -84,101 +92,200 @@ fun ScanScreen(onMenuImageReady: (ByteArray) -> Unit) {
     }
 
     AppScreen(
-        title = "Understand Japanese menus",
-        subtitle = "Take a photo or upload a menu image to get English dish explanations.",
+        title = "",
+        subtitle = "",
         centerContent = true,
-        showBrandAsBlock = true,
-        topPadding = 8.dp
+        showBrandAsBlock = false,
+        showHeaderCard = false,
+        topPadding = 30.dp
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            JapaneseFoodCarousel()
-            Card(
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        shape = RoundedCornerShape(28.dp)
-                    )
-            ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ScanSakuraDecoration()
+
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Column(
-                    modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.offset(y = (-18).dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "Ready to scan a Japanese menu",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        text = "MenuLens",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = "For best accuracy, scan a smaller section instead of too many items at once.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        text = "Understand Japanese menus",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    capturedPreview?.let { bitmap ->
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "Captured menu preview",
-                                modifier = Modifier.fillMaxWidth()
+                    Text(
+                        text = "Take a photo or upload a menu image to get English dish explanations.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+                    )
+                }
+                JapaneseFoodCarousel()
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(28.dp)
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Ready to scan a Japanese menu",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "For best accuracy, scan a smaller section instead of too many items at once.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                        capturedPreview?.let { bitmap ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Captured menu preview",
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        permissionMessage?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
                             )
                         }
-                    }
-                    permissionMessage?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            val hasCameraPermission = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.CAMERA
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (hasCameraPermission) {
-                                permissionMessage = null
-                                cameraLauncher.launch(null)
-                            } else {
-                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text(
-                            text = "Scan Menu",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Button(
-                        onClick = { galleryLauncher.launch("image/*") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Text(
-                            text = "Upload Existing Menu Photo",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Button(
+                            onClick = {
+                                val hasCameraPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (hasCameraPermission) {
+                                    permissionMessage = null
+                                    cameraLauncher.launch(null)
+                                } else {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text(
+                                text = "Scan Menu",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Button(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Text(
+                                text = "Upload Existing Menu Photo",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScanSakuraDecoration() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 84.dp),
+            size = 62.dp,
+            alpha = 0.11f
+        )
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 126.dp)
+                .offset(x = 72.dp),
+            size = 50.dp,
+            alpha = 0.1f
+        )
+    }
+}
+
+@Composable
+private fun SakuraCluster(
+    modifier: Modifier,
+    size: androidx.compose.ui.unit.Dp,
+    alpha: Float
+) {
+    val petalColor = Color(0xFFF3A8BE).copy(alpha = alpha)
+    val centerColor = Color(0xFFF9D6E1).copy(alpha = alpha + 0.05f)
+    val petalSize = size * 0.34f
+
+    Box(modifier = modifier.size(size)) {
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.TopCenter)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.CenterStart)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.CenterEnd)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.BottomStart)
+                .offset(x = 8.dp)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.BottomEnd)
+                .offset(x = (-8).dp)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(size * 0.22f)
+                .align(Alignment.Center)
+                .background(centerColor, CircleShape)
+        )
     }
 }
 

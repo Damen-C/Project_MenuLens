@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.menulens.app.BuildConfig
 import com.menulens.app.ui.screens.DetailScreen
 import com.menulens.app.ui.screens.PaywallScreen
 import com.menulens.app.ui.screens.ProcessingScreen
@@ -85,9 +86,10 @@ fun AppNavGraph() {
         ) {
             val itemId = it.arguments?.getString("itemId").orEmpty()
             val item = uiState.value.itemById(itemId)
+            val debugFallback = if (BuildConfig.DEBUG) debugShowToStaffFallback(itemId) else null
             ShowToStaffScreen(
-                jpText = item?.jpText.orEmpty(),
-                enText = item?.preview?.enTitle,
+                jpText = item?.jpText ?: debugFallback?.first.orEmpty(),
+                enText = item?.preview?.enTitle ?: debugFallback?.second,
                 priceText = item?.priceText
             )
         }
@@ -106,6 +108,14 @@ private fun NavHostController.navigateSingleTop(route: String) {
     navigate(route) {
         popUpTo(Route.Processing.value) { inclusive = true }
         launchSingleTop = true
+    }
+}
+
+private fun debugShowToStaffFallback(itemId: String): Pair<String, String>? {
+    return when (itemId) {
+        "debug_1" -> "いなり寿司" to "Inari Sushi"
+        "debug_2" -> "天ぷらうどん" to "Tempura Udon"
+        else -> null
     }
 }
 
