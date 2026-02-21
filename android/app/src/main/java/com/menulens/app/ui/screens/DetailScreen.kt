@@ -1,5 +1,6 @@
-package com.menulens.app.ui.screens
+﻿package com.menulens.app.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,7 +10,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,10 +30,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.SubcomposeAsyncImage
+import com.menulens.app.BuildConfig
+import com.menulens.app.model.MenuItem
+import com.menulens.app.model.MenuPreview
 import com.menulens.app.viewmodel.ResultsUiState
 
 @Composable
@@ -38,82 +48,104 @@ fun DetailScreen(
     onReveal: () -> Unit,
     onShowToStaff: () -> Unit
 ) {
-    val item = state.itemById(itemId)
-    val unlocked = state.isUnlocked(itemId)
+    val realItem = state.itemById(itemId)
+    val debugFallbackItem = remember(itemId) { debugDetailItemById(itemId) }
+    val item = realItem ?: if (BuildConfig.DEBUG) debugFallbackItem else null
+    val unlocked = state.isUnlocked(itemId) || (BuildConfig.DEBUG && item != null)
     var expandedImageUrl by remember { mutableStateOf<String?>(null) }
 
     AppScreen(
-        title = "Item Detail",
-        subtitle = ""
+        title = "",
+        subtitle = "",
+        showHeaderCard = false
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                modifier = Modifier.border(
-                    width = 2.dp,
-                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(24.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            DetailSakuraDecoration()
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Item Detail",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    modifier = Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(24.dp)
+                    )
                 ) {
-                    if (unlocked && item != null) {
-                        Text(
-                            text = item.preview.enTitle,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = item.preview.enDescription,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = item.jpText,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-                        )
-                        DishImageSection(
-                            imageUrls = item.preview.images,
-                            onImageTap = { expandedImageUrl = it }
-                        )
-                        Text(
-                            text = "Tap an image to expand. If none appear, image search may be unavailable.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                    } else {
-                        Text(
-                            text = "Locked content",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        LockedPlaceholder()
-                        LockedPlaceholder()
-                        Button(
-                            onClick = onReveal,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (unlocked && item != null) {
                             Text(
-                                if (state.creditsRemainingToday > 0 || state.isPro) {
-                                    "Reveal (${state.creditsRemainingToday} left today)"
-                                } else {
-                                    "Upgrade to unlock"
-                                }
+                                text = item.preview.enTitle,
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            Box(modifier = Modifier.padding(horizontal = 6.dp)) {
+                                Text(
+                                    text = item.preview.enDescription,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = item.jpText,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                            )
+                            DishImageSection(
+                                imageUrls = item.preview.images,
+                                onImageTap = { expandedImageUrl = it }
+                            )
+                            Box(modifier = Modifier.padding(horizontal = 6.dp)) {
+                                Text(
+                                    text = "Tap an image to expand. If none appear, image search may be unavailable.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Locked content",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            LockedPlaceholder()
+                            LockedPlaceholder()
+                            Button(
+                                onClick = onReveal,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    if (state.creditsRemainingToday > 0 || state.isPro) {
+                                        "Reveal (${state.creditsRemainingToday} left today)"
+                                    } else {
+                                        "Upgrade to unlock"
+                                    }
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (unlocked && item != null) {
-                ShowToStaffBlock(onShowToStaff = onShowToStaff)
+                if (unlocked && item != null) {
+                    ShowToStaffBlock(
+                        onShowToStaff = onShowToStaff,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
             }
         }
     }
@@ -122,6 +154,93 @@ fun DetailScreen(
         ExpandedImageDialog(
             imageUrl = imageUrl,
             onDismiss = { expandedImageUrl = null }
+        )
+    }
+}
+
+@Composable
+private fun DetailSakuraDecoration() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 42.dp, end = 16.dp),
+            size = 54.dp,
+            alpha = 0.16f
+        )
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 24.dp, bottom = 68.dp),
+            size = 74.dp,
+            alpha = 0.14f
+        )
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 26.dp, bottom = 220.dp),
+            size = 58.dp,
+            alpha = 0.15f
+        )
+        SakuraCluster(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 12.dp)
+                .offset(y = 150.dp),
+            size = 52.dp,
+            alpha = 0.14f
+        )
+    }
+}
+
+@Composable
+private fun SakuraCluster(
+    modifier: Modifier,
+    size: androidx.compose.ui.unit.Dp,
+    alpha: Float
+) {
+    val petalColor = Color(0xFFF3A8BE).copy(alpha = alpha)
+    val centerColor = Color(0xFFF9D6E1).copy(alpha = alpha + 0.05f)
+    val petalSize = size * 0.34f
+
+    Box(modifier = modifier.size(size)) {
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.TopCenter)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.CenterStart)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.CenterEnd)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.BottomStart)
+                .offset(x = 8.dp)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(petalSize)
+                .align(Alignment.BottomEnd)
+                .offset(x = (-8).dp)
+                .background(petalColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(size * 0.22f)
+                .align(Alignment.Center)
+                .background(centerColor, CircleShape)
         )
     }
 }
@@ -211,28 +330,25 @@ private fun RemoteDishImageCard(
 
 @Composable
 private fun ShowToStaffBlock(
-    onShowToStaff: () -> Unit
+    onShowToStaff: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
-        ),
-        modifier = Modifier.fillMaxWidth()
+    Button(
+        onClick = onShowToStaff,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 60.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.tertiary,
+            contentColor = MaterialTheme.colorScheme.onTertiary
+        )
     ) {
-        Button(
-            onClick = onShowToStaff,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.onTertiary
-            )
-        ) {
-            Text("Show to staff")
-        }
+        Text(
+            text = "Show to staff",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -259,6 +375,34 @@ private fun FoodImageFallback(message: String) {
             color = MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
+}
+
+private fun debugDetailItemById(itemId: String): MenuItem? {
+    val debugItems = mapOf(
+        "debug_1" to MenuItem(
+            itemId = "debug_1",
+            jpText = "いなり寿司",
+            priceText = "350 JPY",
+            preview = MenuPreview(
+                enTitle = "Inari Sushi",
+                enDescription = "Sweet and savory fried tofu pouches filled with seasoned sushi rice.",
+                tags = listOf("Sushi"),
+                images = listOf("https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56")
+            )
+        ),
+        "debug_2" to MenuItem(
+            itemId = "debug_2",
+            jpText = "天ぷらうどん",
+            priceText = "980 JPY",
+            preview = MenuPreview(
+                enTitle = "Tempura Udon",
+                enDescription = "Udon noodle soup served with crispy tempura and light dashi broth.",
+                tags = listOf("Noodles"),
+                images = listOf("https://images.unsplash.com/photo-1618841557871-b4664fbf0cb3")
+            )
+        )
+    )
+    return debugItems[itemId]
 }
 
 @Composable
@@ -305,3 +449,4 @@ private fun ExpandedImageDialog(
         }
     }
 }
+
