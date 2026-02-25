@@ -15,7 +15,7 @@ MenuLens is an Android app for scanning Japanese menus and showing English-frien
 
 ## Demo Video
 
-[![Watch MenuLens demo](docs/MenuLens_Demo-ezgif.com-optimize.gif)](https://example.com/menulens-demo)
+[![Watch MenuLens demo](docs/menulens-0225-ezgit.gif)](https://example.com/menulens-demo)
 
 ## Repo Structure
 
