@@ -61,7 +61,7 @@ Set required keys in `backend/.env`:
 
 Optional:
 
-- `GEMINI_MODEL` (default `gemini-1.5-flash`)
+- `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `OCR_PIPELINE_MODE=hybrid|vision_only` (default `hybrid`)
 - `MAX_MENU_ITEMS` (default `10`, valid `1..20`)
 - `ENABLE_IMAGE_SEARCH=true|false` (default `true`)
@@ -90,6 +90,66 @@ API docs:
 
 - `http://127.0.0.1:8000/docs`
 
+## Cloud Deployment (GCP Cloud Run)
+
+This project is deployed on Cloud Run in Tokyo region (`asia-northeast1`).
+
+### 1) Enable required GCP APIs
+
+- Cloud Run Admin API
+- Cloud Build API
+- Artifact Registry API
+
+### 2) Container files
+
+Required files in `backend/`:
+- `Dockerfile`
+- `.dockerignore`
+
+### 3) Build and push image
+
+From repo root:
+
+```bash
+gcloud config set project menulens-487512
+gcloud builds submit backend --tag asia-northeast1-docker.pkg.dev/menulens-487512/menulens-backend/api:latest
+```
+
+### 4) Deploy to Cloud Run
+
+```bash
+gcloud run deploy menulens-api \
+  --image asia-northeast1-docker.pkg.dev/menulens-487512/menulens-backend/api:latest \
+  --platform managed \
+  --region asia-northeast1 \
+  --allow-unauthenticated \
+  --min-instances 0 \
+  --set-env-vars GOOGLE_CLOUD_VISION_API_KEY=YOUR_VISION_KEY,GEMINI_API_KEY=YOUR_GEMINI_KEY,GEMINI_MODEL=gemini-2.5-flash,OCR_PIPELINE_MODE=hybrid,MAX_MENU_ITEMS=10,ENABLE_IMAGE_SEARCH=true,IMAGE_SEARCH_PROVIDER=vertex,GCP_PROJECT_ID=menulens-487512,VERTEX_SEARCH_LOCATION=global,VERTEX_SEARCH_APP_ID=YOUR_VERTEX_APP_ID
+```
+
+Get deployed URL:
+
+```bash
+gcloud run services describe menulens-api --region asia-northeast1 --format='value(status.url)'
+```
+
+### 5) Vertex IAM for image retrieval
+
+Grant Cloud Run runtime service account:
+- `roles/discoveryengine.viewer`
+- `roles/discoveryengine.user` (if needed)
+
+### 6) Validate deployment
+
+- Swagger UI: `https://<cloud-run-url>/docs`
+- Functional endpoint: `POST /v1/scan_menu`
+- Note: `GET /` currently returns `Not Found` (expected, no root route defined)
+
+### 7) Update Android backend URL
+
+Set `API_BASE_URL` in `android/app/build.gradle.kts` to:
+- `https://<cloud-run-url>/`
+
 ## Android Setup
 
 Install app:
@@ -107,6 +167,17 @@ Use:
 
 - Emulator: `http://10.0.2.2:8000/`
 - Physical phone: `http://<your-pc-lan-ip>:8000/`
+- Cloud Run deployed API: `https://menulens-api-gpw37tchwq-an.a.run.app/`
+
+## Operations and Cost Management (GCP)
+
+- Cloud Run with `min-instances=0` scales to zero when idle.
+- Main variable costs are API usage (Vision/Gemini/Vertex), not just Cloud Run compute.
+- Recommended controls:
+  - GCP Billing budget + alert thresholds
+  - Cloud Run max instances cap
+  - Cloud Run logs and metrics monitoring
+  - Secret Manager migration for API keys
 
 ## Known Issue (Current)
 
@@ -119,4 +190,6 @@ Use:
 - `docs/WORKLOG_2026-02-15.md`
 - `docs/WORKLOG_2026-02-16.md`
 - `docs/WORKLOG_2026-02-17.md`
+- `docs/WORKLOG_2026-02-21.md`
+- `docs/WORKLOG_2026-02-25.md`
 - `docs/QUALITY_CHECKLIST.md`
