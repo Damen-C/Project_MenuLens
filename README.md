@@ -193,3 +193,4 @@ Use:
 - `docs/WORKLOG_2026-02-21.md`
 - `docs/WORKLOG_2026-02-25.md`
 - `docs/QUALITY_CHECKLIST.md`
+- `docs/REQUEST_FLOW_DIAGRAM.md`
