@@ -1,4 +1,4 @@
-﻿# MenuLens FastAPI Skeleton
+# MenuLens FastAPI Skeleton
 
 ## Run
 
@@ -20,9 +20,15 @@ Optional:
 - `OCR_PIPELINE_MODE` (`hybrid` or `vision_only`; default: `hybrid`)
 - `MAX_MENU_ITEMS` (default: `10`, valid range: `1..20`)
 - `ENABLE_IMAGE_SEARCH` (default: `true`)
-- `IMAGE_SEARCH_PROVIDER` (`none`, `cse`, or `vertex`; default: `cse`)
+- `IMAGE_SEARCH_PROVIDER` (
+one`, `cse`, or `vertex`; default: `cse`)
 - `GOOGLE_CSE_API_KEY` and `GOOGLE_CSE_CX` (required only when `IMAGE_SEARCH_PROVIDER=cse`)
 - `GCP_PROJECT_ID`, `VERTEX_SEARCH_LOCATION`, `VERTEX_SEARCH_APP_ID` (required only when `IMAGE_SEARCH_PROVIDER=vertex`)
+- `ENABLE_FIREBASE_AUTH` (`true|false`, default: `false`)
+- `FIREBASE_PROJECT_ID` (optional; recommended when Firebase token verification is enabled)
+- `FREE_SCAN_LIMIT_PER_MONTH` (default: `10`)
+- `PRO_SCAN_LIMIT_PER_MONTH` (default: `250`)
+- `SCAN_USAGE_DB_PATH` (default: `scan_usage.db`)
 
 Notes:
 - `OCR_PIPELINE_MODE=hybrid` runs Vision OCR first, then Gemini text normalization before menu parsing.
@@ -35,6 +41,9 @@ Notes:
 Response diagnostics:
 - `items[].ocr_diagnostics` includes per-item calibration signals (`match_score`, `source_quality`, `weak_reasons`).
 - `pipeline_diagnostics` includes coverage signals (`estimated_ocr_candidate_count`, `returned_item_count`, `coverage_ratio`).
+- `pipeline_diagnostics.auth_subject_type` reports whether identity came from Firebase bearer token (`firebase`) or fallback metadata (`device`).
+- `pipeline_diagnostics` also returns usage fields (`usage_period_ym`, `usage_plan`, `usage_scans_used`, `usage_scans_quota`, `usage_scans_remaining`, `usage_duplicate_request`).
+- When quota is exceeded, API returns `402` with `code=scan_quota_exceeded`.
 
 ### Recommended vertex config
 
@@ -68,5 +77,7 @@ curl -X POST "http://127.0.0.1:8000/v1/scan_menu" \
   -F "target_lang=en" \
   -F "device_id=11111111-1111-1111-1111-111111111111" \
   -F "app_version=0.1.0" \
-  -F "timezone=Asia/Tokyo"
+  -F "timezone=Asia/Tokyo" \
+  -F "request_id=9b7cc8b0-2abf-4d1e-8f31-7abff44ad906"
 ```
+

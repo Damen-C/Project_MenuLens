@@ -35,3 +35,4 @@ captures/
 
 # Secrets
 backend/keys/
+android/app/google-services.json
