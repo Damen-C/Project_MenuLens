@@ -29,6 +29,7 @@ one`, `cse`, or `vertex`; default: `cse`)
 - `FREE_SCAN_LIMIT_PER_MONTH` (default: `10`)
 - `PRO_SCAN_LIMIT_PER_MONTH` (default: `250`)
 - `SCAN_USAGE_DB_PATH` (default: `scan_usage.db`)
+- `DEV_BYPASS_QUOTA_UIDS` (optional comma-separated Firebase UIDs for internal developer bypass)
 
 Notes:
 - `OCR_PIPELINE_MODE=hybrid` runs Vision OCR first, then Gemini text normalization before menu parsing.
@@ -44,6 +45,7 @@ Response diagnostics:
 - `pipeline_diagnostics.auth_subject_type` reports whether identity came from Firebase bearer token (`firebase`) or fallback metadata (`device`).
 - `pipeline_diagnostics` also returns usage fields (`usage_period_ym`, `usage_plan`, `usage_scans_used`, `usage_scans_quota`, `usage_scans_remaining`, `usage_duplicate_request`).
 - When quota is exceeded, API returns `402` with `code=scan_quota_exceeded`.
+- Allowlisted developer Firebase UIDs bypass quota entirely and return `usage_plan=dev_unlimited`.
 
 ### Recommended vertex config
 

@@ -81,6 +81,11 @@ logger = logging.getLogger("menulens")
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp")
 _ENABLE_FIREBASE_AUTH = os.getenv("ENABLE_FIREBASE_AUTH", "false").strip().lower() == "true"
 _FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+_DEV_BYPASS_QUOTA_UIDS = {
+    value.strip()
+    for value in os.getenv("DEV_BYPASS_QUOTA_UIDS", "").split(",")
+    if value.strip()
+}
 
 
 def _env_int(name: str, default: int) -> int:
@@ -709,7 +714,12 @@ async def scan_menu(
 ) -> ScanMenuResponse:
     authenticated_uid = _resolve_authenticated_uid(authorization)
     subject_key = f"uid:{authenticated_uid}" if authenticated_uid else f"device:{device_id}"
-    usage = _usage_store.consume_scan(subject_key=subject_key, request_id=request_id)
+
+    if authenticated_uid and authenticated_uid in _DEV_BYPASS_QUOTA_UIDS:
+        logger.info("Developer quota bypass applied. uid=%s", authenticated_uid)
+        usage = _usage_store.developer_bypass_decision(subject_key=subject_key)
+    else:
+        usage = _usage_store.consume_scan(subject_key=subject_key, request_id=request_id)
     if not usage.allowed:
         raise HTTPException(
             status_code=402,

@@ -190,6 +190,18 @@ class UsageStore:
                 self._conn.execute("ROLLBACK")
                 raise
 
+    def developer_bypass_decision(self, subject_key: str) -> UsageDecision:
+        now_tokyo = self._now_utc().astimezone(TOKYO_TZ)
+        period_ym = f"{now_tokyo.year:04d}-{now_tokyo.month:02d}"
+        return self._to_decision(
+            allowed=True,
+            duplicate_request=False,
+            subject_key=subject_key,
+            period_ym=period_ym,
+            used_scans=0,
+            quota_scans=-1,
+            plan="dev_unlimited",
+        )
     def _upsert_and_fetch_usage_locked(
         self,
         *,
