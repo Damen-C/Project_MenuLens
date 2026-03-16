@@ -2,6 +2,27 @@
 
 MenuLens is an Android app for scanning Japanese menus and showing English-friendly dish results.
 
+## Auth And Gating Status
+
+Current implementation includes:
+
+- Android Firebase anonymous sign-in wiring
+- Backend Firebase token verification scaffold
+- Monthly scan quota enforcement (`free: 10/month`, `pro: 250/month`)
+- Request idempotency field (`request_id`) in `POST /v1/scan_menu`
+- Safe developer bypass allowlist via `DEV_BYPASS_QUOTA_UIDS`
+- Fixed results-screen scrolling and bottom inset handling for long menus
+
+Quick backend checks:
+
+- Open `/docs` for `POST /v1/scan_menu`
+- Confirm `request_id` exists in the request form
+
+Current limitations:
+
+- Pro billing is not connected yet
+- Quota storage still uses SQLite and should be moved to shared production storage before real multi-instance rollout
+
 ## Current Status
 
 - Android app: Kotlin + Compose + MVVM flow (`Scan -> Processing -> Results -> Detail`)

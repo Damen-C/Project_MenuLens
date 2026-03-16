@@ -10,10 +10,18 @@ from uuid import uuid4
 
 import httpx
 import google.auth
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from google.auth.transport.requests import Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from app.usage import UsageStore
+
+try:
+    import firebase_admin
+    from firebase_admin import auth as firebase_auth
+except ImportError:
+    firebase_admin = None
+    firebase_auth = None
 
 
 load_dotenv()
@@ -71,6 +79,87 @@ app = FastAPI(title="MenuLens API", version="0.2.0")
 _VERTEX_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 logger = logging.getLogger("menulens")
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp")
+_ENABLE_FIREBASE_AUTH = os.getenv("ENABLE_FIREBASE_AUTH", "false").strip().lower() == "true"
+_FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+_DEV_BYPASS_QUOTA_UIDS = {
+    value.strip()
+    for value in os.getenv("DEV_BYPASS_QUOTA_UIDS", "").split(",")
+    if value.strip()
+}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid integer for {name}: {raw}") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be > 0")
+    return value
+
+
+_FREE_SCAN_LIMIT_PER_MONTH = _env_int("FREE_SCAN_LIMIT_PER_MONTH", 10)
+_PRO_SCAN_LIMIT_PER_MONTH = _env_int("PRO_SCAN_LIMIT_PER_MONTH", 250)
+_SCAN_USAGE_DB_PATH = os.getenv("SCAN_USAGE_DB_PATH", "scan_usage.db").strip() or "scan_usage.db"
+_usage_store = UsageStore(
+    db_path=_SCAN_USAGE_DB_PATH,
+    free_quota=_FREE_SCAN_LIMIT_PER_MONTH,
+    pro_quota=_PRO_SCAN_LIMIT_PER_MONTH,
+)
+
+
+def _ensure_firebase_admin_initialized() -> None:
+    if firebase_admin is None:
+        raise HTTPException(status_code=500, detail="firebase-admin is not installed")
+
+    try:
+        firebase_admin.get_app()
+        return
+    except ValueError:
+        pass
+
+    options = {"projectId": _FIREBASE_PROJECT_ID} if _FIREBASE_PROJECT_ID else None
+    firebase_admin.initialize_app(options=options)
+
+
+def _extract_bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    parts = authorization.strip().split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        return None
+    return parts[1].strip()
+
+
+def _resolve_authenticated_uid(authorization: str | None) -> str | None:
+    token = _extract_bearer_token(authorization)
+    if not token:
+        if _ENABLE_FIREBASE_AUTH:
+            raise HTTPException(status_code=401, detail="Missing Firebase bearer token")
+        return None
+
+    if firebase_auth is None:
+        if _ENABLE_FIREBASE_AUTH:
+            raise HTTPException(status_code=500, detail="firebase-admin import failed")
+        logger.warning("firebase-admin unavailable; continuing without Firebase identity")
+        return None
+
+    try:
+        _ensure_firebase_admin_initialized()
+        decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+    except Exception as exc:
+        if _ENABLE_FIREBASE_AUTH:
+            raise HTTPException(status_code=401, detail="Invalid Firebase ID token") from exc
+        logger.warning("Firebase token verification failed in optional mode: %s", exc)
+        return None
+
+    uid = decoded.get("uid")
+    if not uid:
+        if _ENABLE_FIREBASE_AUTH:
+            raise HTTPException(status_code=401, detail="Firebase token did not include uid")
+        return None
+    return str(uid)
 
 
 def _require_env(name: str) -> str:
@@ -562,7 +651,7 @@ def _resolve_max_menu_items() -> int:
 
 
 def _estimate_ocr_candidate_count(ocr_text: str) -> int:
-    jp_chunks = re.findall(r"[ぁ-んァ-ン一-龯ー]{2,}", ocr_text)
+    jp_chunks = re.findall(r"[\u3041-\u3093\u30A1-\u30F3\u4E00-\u9FAF\u30FC]{2,}", ocr_text)
     unique_chunks = {chunk.strip() for chunk in jp_chunks if chunk.strip()}
     return len(unique_chunks)
 
@@ -620,8 +709,31 @@ async def scan_menu(
     device_id: str = Form(...),
     app_version: str = Form(...),
     timezone: str = Form(...),
+    request_id: str | None = Form(default=None),
+    authorization: str | None = Header(default=None),
 ) -> ScanMenuResponse:
-    _ = (device_id, app_version, timezone)
+    authenticated_uid = _resolve_authenticated_uid(authorization)
+    subject_key = f"uid:{authenticated_uid}" if authenticated_uid else f"device:{device_id}"
+
+    if authenticated_uid and authenticated_uid in _DEV_BYPASS_QUOTA_UIDS:
+        logger.info("Developer quota bypass applied. uid=%s", authenticated_uid)
+        usage = _usage_store.developer_bypass_decision(subject_key=subject_key)
+    else:
+        usage = _usage_store.consume_scan(subject_key=subject_key, request_id=request_id)
+    if not usage.allowed:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "scan_quota_exceeded",
+                "message": "Monthly scan limit reached.",
+                "plan": usage.plan,
+                "period_ym": usage.period_ym,
+                "used_scans": usage.used_scans,
+                "quota_scans": usage.quota_scans,
+                "remaining_scans": usage.remaining_scans,
+            },
+        )
+    _ = (device_id, app_version, timezone, authenticated_uid, request_id)
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Uploaded image is empty")
@@ -726,6 +838,13 @@ async def scan_menu(
                 "estimated_ocr_candidate_count": estimated_candidates,
                 "returned_item_count": len(items),
                 "coverage_ratio": round(coverage_ratio, 3) if coverage_ratio is not None else None,
+                "auth_subject_type": "firebase" if authenticated_uid else "device",
+                "usage_period_ym": usage.period_ym,
+                "usage_plan": usage.plan,
+                "usage_scans_used": usage.used_scans,
+                "usage_scans_quota": usage.quota_scans,
+                "usage_scans_remaining": usage.remaining_scans,
+                "usage_duplicate_request": usage.duplicate_request,
             },
         )
     except HTTPException:

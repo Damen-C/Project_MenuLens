@@ -3,6 +3,7 @@ package com.menulens.app.data
 import android.content.Context
 import android.provider.Settings
 import com.menulens.app.BuildConfig
+import com.menulens.app.auth.FirebaseAuthManager
 import com.menulens.app.model.MenuItem
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -16,6 +17,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.TimeZone
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class ScanRepository(private val context: Context) {
@@ -45,12 +47,21 @@ class ScanRepository(private val context: Context) {
         val imageBody = imageBytes.toRequestBody("image/jpeg".toMediaType())
         val imagePart = MultipartBody.Part.createFormData("image", "menu.jpg", imageBody)
 
+        val authorization = runCatching {
+            FirebaseAuthManager.ensureSignedInAnonymously()
+            FirebaseAuthManager.getBearerTokenOrNull(forceRefresh = false)
+        }.getOrNull()
+
+        val requestId = UUID.randomUUID().toString()
+
         val response = api.scanMenu(
+            authorization = authorization,
             image = imagePart,
             targetLang = "en".toRequestBody("text/plain".toMediaType()),
             deviceId = getDeviceId().toRequestBody("text/plain".toMediaType()),
             appVersion = BuildConfig.VERSION_NAME.toRequestBody("text/plain".toMediaType()),
-            timezone = TimeZone.getDefault().id.toRequestBody("text/plain".toMediaType())
+            timezone = TimeZone.getDefault().id.toRequestBody("text/plain".toMediaType()),
+            requestId = requestId.toRequestBody("text/plain".toMediaType())
         )
         response.toMenuItems()
     }
