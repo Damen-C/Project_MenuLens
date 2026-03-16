@@ -200,18 +200,3 @@ Use:
   - Cloud Run logs and metrics monitoring
   - Secret Manager migration for API keys
 
-## Known Issue (Current)
-
-- Custom Search JSON API has onboarding limitations for new users/projects.
-- Some retrieved image URLs can still be source-dependent and may fail on-device.
-- Fallback behavior is implemented: scan continues with OCR/English text even if image retrieval fails.
-
-## Docs
-
-- `docs/WORKLOG_2026-02-15.md`
-- `docs/WORKLOG_2026-02-16.md`
-- `docs/WORKLOG_2026-02-17.md`
-- `docs/WORKLOG_2026-02-21.md`
-- `docs/WORKLOG_2026-02-25.md`
-- `docs/QUALITY_CHECKLIST.md`
-- `docs/REQUEST_FLOW_DIAGRAM.md`
