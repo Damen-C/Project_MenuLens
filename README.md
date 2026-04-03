@@ -34,6 +34,27 @@ Current limitations:
   - Current recommended provider: Vertex AI Search
 - CI: Android lint + unit tests + debug assemble on GitHub Actions
 
+## Next Step: LLMOps
+
+The next major step for MenuLens is turning the current AI pipeline into a stronger LLMOps case study.
+
+Planned LLMOps work:
+
+- benchmark dataset for real menu images
+- repeatable offline eval runner and scoring
+- explicit prompt versioning
+- structured inference tracing
+- low-confidence review queue
+- CI regression checks for prompt and model changes
+
+The concrete implementation plan lives in [`LLOps Planning.md`](LLOps%20Planning.md).
+
+Why this matters:
+
+- the project already has a real multimodal inference pipeline
+- the next gap is operational discipline, not basic model integration
+- LLMOps work will make quality, regressions, latency, and rollout decisions measurable
+
 ## Demo Video
 
 [![Watch MenuLens demo](docs/menulens-0225-ezgif.gif)](https://example.com/menulens-demo)
@@ -199,4 +220,3 @@ Use:
   - Cloud Run max instances cap
   - Cloud Run logs and metrics monitoring
   - Secret Manager migration for API keys
-
