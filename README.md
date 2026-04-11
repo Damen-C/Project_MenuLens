@@ -38,22 +38,46 @@ Current limitations:
 
 The next major step for MenuLens is turning the current AI pipeline into a stronger LLMOps case study.
 
-Planned LLMOps work:
+LLMOps progress now in place:
 
-- benchmark dataset for real menu images
-- repeatable offline eval runner and scoring
-- explicit prompt versioning
-- structured inference tracing
-- low-confidence review queue
-- CI regression checks for prompt and model changes
+- Real menu-image eval dataset under `backend/evals/dataset/examples.json` and `backend/evals/fixtures/`
+- Repeatable offline eval runner: `python -m evals.run_evals`
+- JSON eval reports under `backend/evals/results/`
+- Excel-compatible eval run ledger: `backend/evals/results/eval_runs.csv`
+- Versioned prompts under `backend/app/prompts/`
+- Env-selectable prompt versions via `MENU_PARSE_PROMPT_VERSION` and `OCR_NORMALIZE_PROMPT_VERSION`
+- Improved Japanese item-name scorer with fuzzy matching and match diagnostics
+- Live pipeline diagnostics now include model, prompt versions, and stage latencies
+
+Current baseline from `backend/evals/results/eval_report_20260411T013853Z.json`:
+
+- Dataset size: 8 real menu fixtures
+- Model: `gemini-2.5-flash`
+- Prompt versions: `menu_parse_v1`, `ocr_normalize_v1`
+- Parse success rate: `1.0`
+- Item recall: `0.8708`
+- Item precision proxy: `0.7704`
+- Hallucinated item rate: `0.2296`
+- Mean latency: `20646.6 ms`
+- P95 latency: `51410.5 ms`
+- Main remaining weak cases: over-extraction on `menu-1`, generic item extraction on `menu-4`, extra item extraction on `menu-5`, handwritten kakiage extraction on `menu-6`
+
+Run evals locally:
+
+```powershell
+cd backend
+python -m evals.run_evals
+```
+
+Immediate follow-up:
+
+- Save the current eval summary as a committed baseline file
+- Add a baseline comparison script for prompt/model regression checks
+- Create `menu_parse_v2` focused on exact Japanese item-name extraction
+- Compare `menu_parse_v2` against the baseline before adopting it
+- Later: add CI regression gating, structured trace persistence, and a low-confidence review queue
 
 The concrete implementation plan lives in [`LLOps Planning.md`](LLOps%20Planning.md).
-
-Why this matters:
-
-- the project already has a real multimodal inference pipeline
-- the next gap is operational discipline, not basic model integration
-- LLMOps work will make quality, regressions, latency, and rollout decisions measurable
 
 ## Demo Video
 

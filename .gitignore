@@ -36,3 +36,10 @@ captures/
 # Secrets
 backend/keys/
 android/app/google-services.json
+
+# Runtime / generated artifacts
+backend/*.db
+scan_usage.db
+backend/evals/results/*.json
+backend/evals/results/*.csv
+!backend/evals/results/.gitkeep

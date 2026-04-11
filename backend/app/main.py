@@ -14,6 +14,7 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from google.auth.transport.requests import Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from app.prompts.registry import get_active_prompt_version, render_prompt
 from app.usage import UsageStore
 
 try:
@@ -200,24 +201,7 @@ async def _vision_ocr(image_bytes: bytes, api_key: str) -> str:
 
 async def _gemini_normalize_ocr_text(ocr_text: str, api_key: str) -> str:
     model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    prompt = f"""
-You are normalizing OCR output from a Japanese restaurant menu photo.
-Return strict JSON only.
-
-Rules:
-- Preserve original meaning. Do not invent menu items.
-- Keep Japanese text, prices, and separators readable.
-- Fix obvious OCR glitches, broken line wraps, and spacing noise.
-- Output should stay close to source text and concise.
-
-JSON schema:
-{{
-  "normalized_text": "string"
-}}
-
-OCR text:
-{ocr_text}
-""".strip()
+    _, prompt = render_prompt("ocr_normalize", ocr_text=ocr_text)
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -260,41 +244,12 @@ def _extract_json_payload(text: str) -> dict[str, Any]:
 async def _gemini_parse_menu(ocr_text: str, target_lang: str, api_key: str) -> LlmOutput:
     model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
     max_items = _resolve_max_menu_items()
-    prompt = f"""
-You are extracting Japanese restaurant menu items.
-Given OCR text, produce strict JSON only.
-
-Requirements:
-- Target language: {target_lang}
-- Prefer true dish names over noisy OCR fragments.
-- Return 1 to {max_items} best dish items.
-- Keep en_description short (max 25 words).
-- Keep tags short lowercase tokens.
-- image_query should be a good web image search query in English.
-- Do not invent items that are not present in OCR text.
-- Do not infer serving style unless explicit in OCR text:
-  - Avoid adding "nigiri", "gunkanmaki", "maki", "roll", or "sashimi" when not shown.
-- If unsure, keep en_title literal and conservative.
-
-JSON schema:
-{{
-  "detected_type": "string",
-  "items": [
-    {{
-      "jp_text": "string",
-      "price_text": "string or empty",
-      "en_title": "string",
-      "en_description": "string",
-      "tags": ["string"],
-      "image_query": "string",
-      "confidence": 0.0
-    }}
-  ]
-}}
-
-OCR text:
-{ocr_text}
-""".strip()
+    _, prompt = render_prompt(
+        "menu_parse",
+        ocr_text=ocr_text,
+        target_lang=target_lang,
+        max_items=max_items,
+    )
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -756,16 +711,29 @@ async def scan_menu(
 
     try:
         scan_start = time.perf_counter()
+        prompt_versions = {
+            "menu_parse_prompt_version": get_active_prompt_version("menu_parse"),
+            "ocr_normalize_prompt_version": get_active_prompt_version("ocr_normalize"),
+        }
+        stage_latency_ms: dict[str, int] = {}
+        vision_start = time.perf_counter()
         vision_ocr_text = await _vision_ocr(image_bytes=image_bytes, api_key=vision_key)
+        stage_latency_ms["vision_ocr"] = int((time.perf_counter() - vision_start) * 1000)
         if not vision_ocr_text:
             return _fallback_response()
 
         normalized_ocr_text: str | None = None
+        normalization_fallback_used = False
         if ocr_pipeline_mode == "hybrid":
+            normalize_start = time.perf_counter()
             try:
                 normalized_ocr_text = await _gemini_normalize_ocr_text(ocr_text=vision_ocr_text, api_key=gemini_key)
             except Exception:
+                normalization_fallback_used = True
                 logger.exception("OCR normalization failed. Falling back to raw Vision OCR text.")
+            stage_latency_ms["ocr_normalize"] = int((time.perf_counter() - normalize_start) * 1000)
+        else:
+            stage_latency_ms["ocr_normalize"] = 0
 
         parse_source_text = normalized_ocr_text or vision_ocr_text
         normalization_changed = (
@@ -773,12 +741,15 @@ async def scan_menu(
             and _normalize_for_match(normalized_ocr_text) != _normalize_for_match(vision_ocr_text)
         )
 
+        parse_start = time.perf_counter()
         llm = await _gemini_parse_menu(ocr_text=parse_source_text, target_lang=target_lang, api_key=gemini_key)
+        stage_latency_ms["menu_parse"] = int((time.perf_counter() - parse_start) * 1000)
         if not llm.items:
             return _fallback_response()
 
         estimated_candidates = _estimate_ocr_candidate_count(parse_source_text)
         items: list[ScanItem] = []
+        image_search_start = time.perf_counter()
         for raw_item in llm.items[:max_menu_items]:
             query = raw_item.image_query or raw_item.en_title
             images = await _image_search_by_provider(
@@ -820,12 +791,14 @@ async def scan_menu(
             )
             items[-1].confidence = final_confidence
             items[-1].ocr_diagnostics = diagnostics
+        stage_latency_ms["image_retrieval_total"] = int((time.perf_counter() - image_search_start) * 1000)
 
+        total_latency_ms = int((time.perf_counter() - scan_start) * 1000)
         logger.info(
             "scan_menu completed. mode=%s items=%s elapsed_ms=%s",
             ocr_pipeline_mode,
             len(items),
-            int((time.perf_counter() - scan_start) * 1000),
+            total_latency_ms,
         )
         coverage_ratio = min(1.0, len(items) / estimated_candidates) if estimated_candidates > 0 else None
         return ScanMenuResponse(
@@ -838,6 +811,11 @@ async def scan_menu(
                 "estimated_ocr_candidate_count": estimated_candidates,
                 "returned_item_count": len(items),
                 "coverage_ratio": round(coverage_ratio, 3) if coverage_ratio is not None else None,
+                "model": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+                "image_search_provider": provider,
+                "normalization_fallback_used": normalization_fallback_used,
+                "stage_latency_ms": stage_latency_ms,
+                "total_latency_ms": total_latency_ms,
                 "auth_subject_type": "firebase" if authenticated_uid else "device",
                 "usage_period_ym": usage.period_ym,
                 "usage_plan": usage.plan,
@@ -845,6 +823,7 @@ async def scan_menu(
                 "usage_scans_quota": usage.quota_scans,
                 "usage_scans_remaining": usage.remaining_scans,
                 "usage_duplicate_request": usage.duplicate_request,
+                **prompt_versions,
             },
         )
     except HTTPException:
