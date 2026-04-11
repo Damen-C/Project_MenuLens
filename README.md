@@ -12,12 +12,7 @@ Current implementation includes:
 - Request idempotency field (`request_id`) in `POST /v1/scan_menu`
 - Safe developer bypass allowlist via `DEV_BYPASS_QUOTA_UIDS`
 - Fixed results-screen scrolling and bottom inset handling for long menus
-
-Quick backend checks:
-
-- Open `/docs` for `POST /v1/scan_menu`
-- Confirm `request_id` exists in the request form
-
+  
 Current limitations:
 
 - Pro billing is not connected yet
