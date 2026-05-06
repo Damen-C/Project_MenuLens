@@ -2,6 +2,10 @@
 
 MenuLens is an Android app plus FastAPI backend for scanning Japanese menus and returning English-friendly dish results.
 
+## Demo Video
+
+[![Watch MenuLens demo](docs/menulens-0225-ezgif.gif)](https://example.com/menulens-demo)
+
 ## Project Status
 
 This project is effectively complete.
