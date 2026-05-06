@@ -9,7 +9,7 @@ _PROMPT_ENV_VARS = {
 }
 _DEFAULT_VERSIONS = {
     "ocr_normalize": "ocr_normalize_v1",
-    "menu_parse": "menu_parse_v1",
+    "menu_parse": "menu_parse_v2",
 }
 
 

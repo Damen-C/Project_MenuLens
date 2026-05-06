@@ -1,111 +1,89 @@
 # MenuLens
 
-MenuLens is an Android app for scanning Japanese menus and showing English-friendly dish results.
+MenuLens is an Android app plus FastAPI backend for scanning Japanese menus and returning English-friendly dish results.
 
-## Auth And Gating Status
+## Project Status
 
-Current implementation includes:
+This project is effectively complete.
 
-- Android Firebase anonymous sign-in wiring
-- Backend Firebase token verification scaffold
-- Monthly scan quota enforcement (`free: 10/month`, `pro: 250/month`)
-- Request idempotency field (`request_id`) in `POST /v1/scan_menu`
-- Safe developer bypass allowlist via `DEV_BYPASS_QUOTA_UIDS`
-- Fixed results-screen scrolling and bottom inset handling for long menus
-  
-Current limitations:
+Current implemented state:
 
-- Pro billing is not connected yet
-- Quota storage still uses SQLite and should be moved to shared production storage before real multi-instance rollout
+- Android client built with Kotlin, Compose, and an MVVM-style flow
+- FastAPI backend with `POST /v1/scan_menu`
+- OCR via Google Cloud Vision
+- Dish extraction, translation, and short description generation via Gemini
+- Optional image retrieval with provider selection: `none | cse | vertex`
+- Firebase anonymous auth wiring and backend token verification scaffold
+- Monthly scan quota enforcement with idempotent request handling
+- Offline eval dataset, runner, scoring, and run ledger for prompt iteration
 
-## Current Status
+Current default prompt versions:
 
-- Android app: Kotlin + Compose + MVVM flow (`Scan -> Processing -> Results -> Detail`)
-- Backend API: FastAPI `POST /v1/scan_menu`
-- Live pipeline implemented:
-  - OCR: Google Cloud Vision API
-  - Dish extraction/translation/description: Gemini
-  - Image retrieval: provider-based (`none | cse | vertex`)
-  - Current recommended provider: Vertex AI Search
-- CI: Android lint + unit tests + debug assemble on GitHub Actions
-
-## Next Step: LLMOps
-
-The next major step for MenuLens is turning the current AI pipeline into a stronger LLMOps case study.
-
-LLMOps progress now in place:
-
-- Real menu-image eval dataset under `backend/evals/dataset/examples.json` and `backend/evals/fixtures/`
-- Repeatable offline eval runner: `python -m evals.run_evals`
-- JSON eval reports under `backend/evals/results/`
-- Excel-compatible eval run ledger: `backend/evals/results/eval_runs.csv`
-- Versioned prompts under `backend/app/prompts/`
-- Env-selectable prompt versions via `MENU_PARSE_PROMPT_VERSION` and `OCR_NORMALIZE_PROMPT_VERSION`
-- Improved Japanese item-name scorer with fuzzy matching and match diagnostics
-- Live pipeline diagnostics now include model, prompt versions, and stage latencies
-
-Current baseline from `backend/evals/results/eval_report_20260411T013853Z.json`:
-
-- Dataset size: 8 real menu fixtures
-- Model: `gemini-2.5-flash`
-- Prompt versions: `menu_parse_v1`, `ocr_normalize_v1`
-- Parse success rate: `1.0`
-- Item recall: `0.8708`
-- Item precision proxy: `0.7704`
-- Hallucinated item rate: `0.2296`
-- Mean latency: `20646.6 ms`
-- P95 latency: `51410.5 ms`
-- Main remaining weak cases: over-extraction on `menu-1`, generic item extraction on `menu-4`, extra item extraction on `menu-5`, handwritten kakiage extraction on `menu-6`
-
-Run evals locally:
-
-```powershell
-cd backend
-python -m evals.run_evals
-```
-
-Immediate follow-up:
-
-- Save the current eval summary as a committed baseline file
-- Add a baseline comparison script for prompt/model regression checks
-- Create `menu_parse_v2` focused on exact Japanese item-name extraction
-- Compare `menu_parse_v2` against the baseline before adopting it
-- Later: add CI regression gating, structured trace persistence, and a low-confidence review queue
-
-The concrete implementation plan lives in [`LLOps Planning.md`](LLOps%20Planning.md).
-
-## Demo Video
-
-[![Watch MenuLens demo](docs/menulens-0225-ezgif.gif)](https://example.com/menulens-demo)
+- `menu_parse_v2`
+- `ocr_normalize_v1`
 
 ## Repo Structure
 
 - `android/` Android application
-- `backend/` FastAPI service
-- `docs/` work logs, quality checklist, next agenda
+- `backend/` FastAPI service and eval tooling
+- `docs/` worklogs, product notes, and reference docs
 
-## Prerequisites
+## Backend Pipeline
 
-### Android
+The backend pipeline is:
 
-- JDK 17 required for Gradle builds
-- Android SDK + device/emulator
+1. OCR the uploaded menu image with Google Cloud Vision.
+2. Optionally normalize OCR text with Gemini.
+3. Extract Japanese menu items with a versioned Gemini prompt.
+4. Translate and summarize dishes for English-speaking users.
+5. Optionally retrieve preview images.
+6. Return item-level diagnostics, confidence, and timing metadata.
 
-PowerShell (current terminal session):
+## Evaluation Setup
+
+MenuLens includes an offline eval loop under `backend/evals/`:
+
+- Dataset: `backend/evals/dataset/examples.json`
+- Fixtures: `backend/evals/fixtures/`
+- Runner: `python -m evals.run_evals`
+- Reports: `backend/evals/results/eval_report_*.json`
+- Run ledger: `backend/evals/results/eval_runs.csv`
+
+Prompt versions are tracked in both the JSON report and CSV ledger.
+
+Current adopted eval result for `menu_parse_v2` from `backend/evals/results/eval_report_20260506T013708Z.json`:
+
+- Dataset size: `8`
+- Model: `gemini-2.5-flash`
+- Parse success rate: `1.0`
+- Item recall: `0.8708`
+- Item precision proxy: `0.8430`
+- Hallucinated item rate: `0.1570`
+- Coverage ratio: `1.0`
+- Mean latency: `20041.9 ms`
+- P95 latency: `45657.8 ms`
+
+Compared with the prior `menu_parse_v1` baseline, `v2` reduced hallucinated items and improved precision without reducing recall, so it is now the default app prompt.
+
+Run evals locally:
 
 ```powershell
-$env:JAVA_HOME="C:\Users\tsai1\.jdks\temurin-17.0.18"
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
-java -version
+cd d:\Project_MenuLens\backend
+.\.venv\Scripts\python.exe -m evals.run_evals
 ```
 
-Do not commit `org.gradle.java.home` into `android/gradle.properties` (machine-specific).
+Run evals with a specific prompt version:
 
-### Backend
-
-- Python 3.12 recommended (Python 3.14 caused dependency build issues)
+```powershell
+cd d:\Project_MenuLens\backend
+$env:MENU_PARSE_PROMPT_VERSION = "menu_parse_v2"
+.\.venv\Scripts\python.exe -m evals.run_evals
+Remove-Item Env:MENU_PARSE_PROMPT_VERSION
+```
 
 ## Backend Setup
+
+Python `3.12` is recommended.
 
 ```powershell
 cd backend
@@ -115,35 +93,34 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Set required keys in `backend/.env`:
+Required keys in `backend/.env`:
 
 - `GOOGLE_CLOUD_VISION_API_KEY`
 - `GEMINI_API_KEY`
 
-Optional:
+Common optional settings:
 
-- `GEMINI_MODEL` (default `gemini-2.5-flash`)
-- `OCR_PIPELINE_MODE=hybrid|vision_only` (default `hybrid`)
-- `MAX_MENU_ITEMS` (default `10`, valid `1..20`)
-- `ENABLE_IMAGE_SEARCH=true|false` (default `true`)
+- `GEMINI_MODEL` default `gemini-2.5-flash`
+- `OCR_PIPELINE_MODE=hybrid|vision_only`
+- `MAX_MENU_ITEMS=1..20`
 - `IMAGE_SEARCH_PROVIDER=none|cse|vertex`
 
-If `IMAGE_SEARCH_PROVIDER=cse`:
+If using `cse`:
+
 - `GOOGLE_CSE_API_KEY`
 - `GOOGLE_CSE_CX`
 
-If `IMAGE_SEARCH_PROVIDER=vertex`:
-- `GCP_PROJECT_ID`
-- `VERTEX_SEARCH_LOCATION` (usually `global`)
-- `VERTEX_SEARCH_APP_ID`
+If using `vertex`:
 
-Vertex auth (required when using `vertex`):
-- Service-account JSON: set `GOOGLE_APPLICATION_CREDENTIALS` to key file path, or
-- Local ADC login: `gcloud auth application-default login`
+- `GCP_PROJECT_ID`
+- `VERTEX_SEARCH_LOCATION`
+- `VERTEX_SEARCH_APP_ID`
+- Google application credentials or local ADC login
 
 Run backend:
 
 ```powershell
+cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -151,91 +128,42 @@ API docs:
 
 - `http://127.0.0.1:8000/docs`
 
-## Cloud Deployment (GCP Cloud Run)
-
-This project is deployed on Cloud Run in Tokyo region (`asia-northeast1`).
-
-### 1) Enable required GCP APIs
-
-- Cloud Run Admin API
-- Cloud Build API
-- Artifact Registry API
-
-### 2) Container files
-
-Required files in `backend/`:
-- `Dockerfile`
-- `.dockerignore`
-
-### 3) Build and push image
-
-From repo root:
-
-```bash
-gcloud config set project menulens-487512
-gcloud builds submit backend --tag asia-northeast1-docker.pkg.dev/menulens-487512/menulens-backend/api:latest
-```
-
-### 4) Deploy to Cloud Run
-
-```bash
-gcloud run deploy menulens-api \
-  --image asia-northeast1-docker.pkg.dev/menulens-487512/menulens-backend/api:latest \
-  --platform managed \
-  --region asia-northeast1 \
-  --allow-unauthenticated \
-  --min-instances 0 \
-  --set-env-vars GOOGLE_CLOUD_VISION_API_KEY=YOUR_VISION_KEY,GEMINI_API_KEY=YOUR_GEMINI_KEY,GEMINI_MODEL=gemini-2.5-flash,OCR_PIPELINE_MODE=hybrid,MAX_MENU_ITEMS=10,ENABLE_IMAGE_SEARCH=true,IMAGE_SEARCH_PROVIDER=vertex,GCP_PROJECT_ID=menulens-487512,VERTEX_SEARCH_LOCATION=global,VERTEX_SEARCH_APP_ID=YOUR_VERTEX_APP_ID
-```
-
-Get deployed URL:
-
-```bash
-gcloud run services describe menulens-api --region asia-northeast1 --format='value(status.url)'
-```
-
-### 5) Vertex IAM for image retrieval
-
-Grant Cloud Run runtime service account:
-- `roles/discoveryengine.viewer`
-- `roles/discoveryengine.user` (if needed)
-
-### 6) Validate deployment
-
-- Swagger UI: `https://<cloud-run-url>/docs`
-- Functional endpoint: `POST /v1/scan_menu`
-- Note: `GET /` currently returns `Not Found` (expected, no root route defined)
-
-### 7) Update Android backend URL
-
-Set `API_BASE_URL` in `android/app/build.gradle.kts` to:
-- `https://<cloud-run-url>/`
-
 ## Android Setup
 
-Install app:
+Requirements:
+
+- JDK `17`
+- Android SDK
+- Emulator or device
+
+Install debug build:
 
 ```powershell
 cd android
 .\gradlew installDebug
 ```
 
-Backend base URL is configured in:
-
-- `android/app/build.gradle.kts` (`API_BASE_URL`)
+Backend base URL is configured in `android/app/build.gradle.kts`.
 
 Use:
 
 - Emulator: `http://10.0.2.2:8000/`
-- Physical phone: `http://<your-pc-lan-ip>:8000/`
-- Cloud Run deployed API: `https://menulens-api-gpw37tchwq-an.a.run.app/`
+- Physical device: `http://<your-pc-lan-ip>:8000/`
+- Cloud Run deployment: `https://menulens-api-gpw37tchwq-an.a.run.app/`
 
-## Operations and Cost Management (GCP)
+## Deployment Notes
 
-- Cloud Run with `min-instances=0` scales to zero when idle.
-- Main variable costs are API usage (Vision/Gemini/Vertex), not just Cloud Run compute.
-- Recommended controls:
-  - GCP Billing budget + alert thresholds
-  - Cloud Run max instances cap
-  - Cloud Run logs and metrics monitoring
-  - Secret Manager migration for API keys
+The backend was set up for Cloud Run in `asia-northeast1`.
+
+Operational notes:
+
+- Cloud Run can scale to zero when idle
+- Main variable costs come from Vision, Gemini, and image retrieval APIs
+- SQLite quota storage is acceptable for local or single-instance use, but not a true shared production store
+- Pro billing is not connected
+
+## Documents
+
+- [LLOps Planning.md](LLOps%20Planning.md)
+- [docs/WORKLOG_2026-05-06.md](docs/WORKLOG_2026-05-06.md)
+- [docs/WORKLOG_2026-04-11.md](docs/WORKLOG_2026-04-11.md)
